@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>MyAdmin - Permohonan (Upload PDF/Gambar)</title>
+
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Font Awesome -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+
+  <style>
+    :root{ --bg: #f4f6fb; --accent: #0d6efd; }
+    body{background:var(--bg);font-family:system-ui,Segoe UI,Roboto,Inter,Arial;margin:0}
+    .sidebar{
+      background: linear-gradient(180deg,#0b1220 0%, #0f172a 100%);
+      color: #e6eef8;
+      min-height:100vh;
+      padding-top:22px;
+    }
+    .sidebar a{color:rgba(230,238,248,0.9);text-decoration:none;display:block;padding:10px 16px;border-radius:8px;}
+    .sidebar a:hover{background:rgba(255,255,255,0.06);}
+    .brand {display:flex;align-items:center;gap:10px;padding:0 16px;margin-bottom:18px}
+    .brand .logo{width:44px;height:44px;background:linear-gradient(135deg,#6C5CE7,#00BCD4);display:flex;align-items:center;justify-content:center;border-radius:8px;font-weight:800;color:white}
+    .muted{color:#6b7280}
+    .drag-area{border:2px dashed rgba(13,110,253,0.25);border-radius:10px;padding:18px;text-align:center;background:white;cursor:pointer}
+    .drag-area.dragover{background: #eef6ff; border-color: rgba(13,110,253,0.6); }
+    .file-thumb{max-width:120px;max-height:90px;border-radius:6px;object-fit:cover}
+    .report-card{border-radius:10px;padding:12px;margin-bottom:10px;background:white;box-shadow:0 6px 18px rgba(12,16,30,0.03)}
+    .toast-container{position:fixed;bottom:20px;right:20px;z-index:1200}
+    @media (max-width:991px){
+      .sidebar{position:fixed;left:-260px;width:240px;z-index:1030;transition:left .25s}
+      .sidebar.open{left:0}
+      .overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1020;display:none}
+      .overlay.show{display:block}
+    }
+  </style>
+</head>
+<body>
+
+<!-- Mobile overlay for sidebar -->
+<div class="overlay" id="pageOverlay" onclick="closeSidebar()"></div>
+
+<div class="container-fluid">
+  <div class="row g-0">
+
+    <!-- SIDEBAR -->
+    <nav class="col-lg-2 sidebar d-flex flex-column" id="sidebar">
+      <div class="brand">
+        <div class="logo">M</div>
+        <div>
+          <div style="font-weight:800">MyAdmin</div>
+          <div style="font-size:12px;color:rgba(230,238,248,0.75)">panel • sederhana</div>
+        </div>
+      </div>
+
+      <div class="px-2">
+        <a href="#" id="linkDashboard"><i class="fas fa-home me-2"></i> Dashboard</a>
+        <a href="#" id="linkPermohonan"><i class="fas fa-file-lines me-2"></i> Permohonan</a>
+      </div>
+
+      <div class="mt-auto px-3 pb-4">
+        <hr style="border-color:rgba(255,255,255,0.06)"/>
+        <div id="adminNameDisplay" style="font-size:14px;line-height:1.1">
+          <div class="muted" style="font-size:12px">Login sebagai</div>
+          <div id="adminName" style="font-weight:700">—</div>
+        </div>
+        <button class="btn btn-outline-light w-100 mt-3" id="btnLogout"><i class="fas fa-sign-out-alt me-2"></i> Logout</button>
+      </div>
+    </nav>
+
+    <!-- MAIN -->
+    <main class="col-lg-10 ms-auto">
+      <!-- TOPBAR -->
+      <header class="d-flex align-items-center justify-content-between p-3 border-bottom bg-white">
+        <div class="d-flex align-items-center gap-2">
+          <button class="btn btn-light d-lg-none" id="toggleSidebarBtn"><i class="fas fa-bars"></i></button>
+          <h5 class="mb-0">Dashboard</h5>
+          <small class="text-muted ms-2" id="welcomeSmall">Selamat datang!</small>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <div class="text-end me-2 d-none d-md-block">
+            <div style="font-weight:700" id="topAdminName">—</div>
+            <div class="muted" style="font-size:12px">Administrator</div>
+          </div>
+          <button class="btn btn-outline-secondary" id="openLoginBtn"><i class="fas fa-user"></i></button>
+        </div>
+      </header>
+
+      <div class="p-4">
+        <!-- DASHBOARD PAGE -->
+        <section id="dashboardPage">
+          <div class="card p-3 mb-3">
+            <h6>Selamat datang</h6>
+            <p class="muted">Gunakan menu Permohonan untuk mengirim laporan / file (PDF/gambar). Berkas disimpan lokal di browser.</p>
+          </div>
+        </section>
+
+        <!-- PERMOHONAN PAGE -->
+        <section id="permohonanPage" class="d-none">
+          <div class="card p-3 mb-3">
+            <h5>Kirim Permohonan</h5>
+
+            <form id="reportForm">
+              <div class="mb-3">
+                <label class="form-label">Isi Permohonan</label>
+                <textarea id="reportText" class="form-control" rows="3" placeholder="Masukkan permohonan..." required></textarea>
+              </div>
+
+              <div class="mb-3">
+                <div id="dragArea" class="drag-area">
+                  <div id="dragMessage"><i class="fas fa-cloud-upload-alt fa-lg"></i> <div>Tarik & lepas file di sini atau klik untuk pilih file (PDF / gambar)</div></div>
+                  <input id="fileInput" type="file" accept="image/*,application/pdf" style="display:none" />
+                  <div id="selectedFileInfo" style="margin-top:8px;font-size:13px;color:#6b7280"></div>
+                </div>
+                <div class="muted" style="font-size:12px;margin-top:8px">Maks ~3 MB per file disarankan. Jika terjadi error penyimpanan berarti file terlalu besar/kuota penuh.</div>
+              </div>
+
+              <div class="d-flex gap-2">
+                <button class="btn btn-primary" type="submit">Kirim</button>
+                <button class="btn btn-outline-secondary" type="button" id="btnClearReports">Hapus Semua</button>
+              </div>
+            </form>
+          </div>
+
+          <div class="card p-3">
+            <h6>Daftar Permohonan</h6>
+            <div id="reportsList" class="mt-2">
+              <div class="muted">Belum ada permohonan.</div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+
+      <footer class="p-3 text-center muted">
+        &copy; <span id="year"></span> MyAdmin • Built simple
+      </footer>
+    </main>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- Modal Login (no X, static backdrop) -->
+<div class="modal fade" id="adminModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title">Login Admin</h6>
+      </div>
+      <div class="modal-body">
+        <form id="modalLoginForm">
+          <div class="mb-2">
+            <label class="form-label">Email</label>
+            <input id="modalAdminEmail" type="email" class="form-control" placeholder="Masukkan email..." required/>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Password</label>
+            <input id="modalPassword" type="password" class="form-control" placeholder="Password (tidak disimpan)"/>
+          </div>
+          <div class="d-grid">
+            <button class="btn btn-primary" type="submit">Masuk</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+/* ------------------ Utilities ------------------ */
+const el = id => document.getElementById(id);
+el('year').textContent = new Date().getFullYear();
+
+function showToast(title, text='') {
+  const container = el('toastContainer');
+  const t = document.createElement('div');
+  t.className = 'toast align-items-center text-bg-light border-0 show';
+  t.style.minWidth = '260px';
+  t.innerHTML = `
+    <div class="d-flex">
+      <div class="toast-body"><strong>${escapeHtml(title)}</strong><div style="font-size:13px;color:#6b7280">${escapeHtml(text)}</div></div>
+      <button type="button" class="btn-close me-2 m-auto" aria-label="Close"></button>
+    </div>`;
+  container.appendChild(t);
+  t.querySelector('.btn-close').addEventListener('click', ()=> t.remove());
+  setTimeout(()=> t.remove(), 5000);
+}
+function escapeHtml(s){ return s ? s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;') : ''; }
+
+/* ------------------ Sidebar & Pages ------------------ */
+const sidebar = el('sidebar');
+const overlay = el('pageOverlay');
+function openSidebar(){ sidebar.classList.add('open'); overlay.classList.add('show'); }
+function closeSidebar(){ sidebar.classList.remove('open'); overlay.classList.remove('show'); }
+el('toggleSidebarBtn').addEventListener('click', ()=> sidebar.classList.contains('open') ? closeSidebar() : openSidebar());
+overlay.addEventListener('click', closeSidebar);
+
+const pages = { dashboard: el('dashboardPage'), permohonan: el('permohonanPage') };
+function showPage(name){
+  for(const k in pages) pages[k].classList.add('d-none');
+  pages[name].classList.remove('d-none');
+  el('welcomeSmall').textContent = (name === 'dashboard') ? 'Selamat datang!' : (name.charAt(0).toUpperCase()+name.slice(1));
+  if(window.innerWidth < 992) closeSidebar();
+}
+el('linkDashboard').addEventListener('click', e=>{ e.preventDefault(); showPage('dashboard'); });
+el('linkPermohonan').addEventListener('click', e=>{ e.preventDefault(); showPage('permohonan'); });
+
+/* ------------------ Admin login / name ------------------ */
+const ADMIN_KEY = 'myadmin_name_v1';
+function loadAdminName(){
+  const name = localStorage.getItem(ADMIN_KEY) || '—';
+  el('adminName').textContent = name;
+  el('topAdminName').textContent = name;
+}
+loadAdminName();
+
+const adminModal = new bootstrap.Modal(document.getElementById('adminModal'));
+el('openLoginBtn').addEventListener('click', ()=> adminModal.show());
+el('modalLoginForm').addEventListener('submit', function(e){
+  e.preventDefault();
+  const email = el('modalAdminEmail').value.trim();
+  if(!email) return alert('Isi email.');
+  localStorage.setItem(ADMIN_KEY, email);
+  loadAdminName();
+  adminModal.hide();
+  showToast('Login berhasil', `Halo, ${email}`);
+});
+
+/* Logout */
+el('btnLogout').addEventListener('click', function(){
+  if(confirm('Logout dari panel?')) {
+    localStorage.removeItem(ADMIN_KEY);
+    loadAdminName();
+    showPage('dashboard');
+    showToast('Logout', 'Sampai jumpa.');
+  }
+});
+if(!localStorage.getItem(ADMIN_KEY)) setTimeout(()=> adminModal.show(), 500);
+
+/* ------------------ Reports + file handling ------------------ */
+const REPORTS_KEY = 'myadmin_reports_v1';
+let reports = JSON.parse(localStorage.getItem(REPORTS_KEY) || '[]');
+
+function saveReports(){
+  try {
+    localStorage.setItem(REPORTS_KEY, JSON.stringify(reports));
+    renderReports();
+    return true;
+  } catch(err) {
+    console.error('localStorage error:', err);
+    alert('Gagal menyimpan. Kemungkinan ukuran file terlalu besar atau kuota browser penuh.');
+    return false;
+  }
+}
+
+function renderReports(){
+  const out = el('reportsList');
+  out.innerHTML = '';
+  if(!reports || reports.length === 0){
+    out.innerHTML = '<div class="muted">Belum ada permohonan.</div>';
+    return;
+  }
+  // render newest first
+  for(let i = reports.length-1; i >= 0; i--){
+    const r = reports[i];
+    const card = document.createElement('div');
+    card.className = 'report-card d-flex gap-3 align-items-start';
+
+    // left: thumbnail or icon
+    const left = document.createElement('div');
+    left.style.minWidth = '120px';
+    if(r.fileData && r.fileType && r.fileName){
+      if(r.fileType.startsWith('image/')){
+        const img = document.createElement('img');
+        img.src = r.fileData;
+        img.alt = r.fileName;
+        img.className = 'file-thumb';
+        left.appendChild(img);
+      } else {
+        // PDF or others: show icon + name
+        left.innerHTML = `<div style="font-size:36px;color:#0d6efd"><i class="fas fa-file-pdf"></i></div><div style="font-size:13px">${escapeHtml(r.fileName)}</div>`;
+      }
+    } else {
+      left.innerHTML = `<div style="font-size:36px;color:#6b7280"><i class="fas fa-file-alt"></i></div>`;
+    }
+
+    // body
+    const body = document.createElement('div');
+    body.style.flex = '1';
+    body.innerHTML = `<div style="font-size:13px;color:#6b7280">${new Date(r.time).toLocaleString()}</div>
+                      <div style="margin-top:6px">${escapeHtml(r.text)}</div>`;
+
+    // actions (download, delete)
+    const actions = document.createElement('div');
+    actions.style.minWidth = '120px';
+    actions.className = 'text-end';
+    if(r.fileData && r.fileName){
+      const a = document.createElement('a');
+      a.href = r.fileData;
+      a.download = r.fileName;
+      a.className = 'btn btn-sm btn-outline-primary mb-2';
+      a.innerHTML = '<i class="fas fa-download me-1"></i> Download';
+      actions.appendChild(a);
+      actions.appendChild(document.createElement('br'));
+    }
+    const del = document.createElement('button');
+    del.className = 'btn btn-sm btn-danger';
+    del.innerHTML = '<i class="fas fa-trash me-1"></i> Hapus';
+    del.addEventListener('click', ()=>{
+      if(confirm('Hapus permohonan ini?')){
+        // remove by index
+        const idx = reports.indexOf(r);
+        if(idx !== -1){
+          reports.splice(idx,1);
+          saveReports();
+          showToast('Permohonan dihapus');
+        }
+      }
+    });
+    actions.appendChild(del);
+
+    card.appendChild(left);
+    card.appendChild(body);
+    card.appendChild(actions);
+    out.appendChild(card);
+  }
+}
+renderReports();
+
+/* File selection & drag & drop */
+const fileInput = el('fileInput');
+const dragArea = el('dragArea');
+const selectedFileInfo = el('selectedFileInfo');
+
+let pendingFile = null; // {file, name, type, dataUrl}
+
+dragArea.addEventListener('click', ()=> fileInput.click());
+fileInput.addEventListener('change', async (e)=> {
+  if(e.target.files && e.target.files[0]) {
+    handleSelectedFile(e.target.files[0]);
+  }
+});
+
+['dragenter','dragover'].forEach(ev=>{
+  dragArea.addEventListener(ev, (e)=>{ e.preventDefault(); e.stopPropagation(); dragArea.classList.add('dragover'); });
+});
+['dragleave','dragend','drop'].forEach(ev=>{
+  dragArea.addEventListener(ev, (e)=>{ e.preventDefault(); e.stopPropagation(); dragArea.classList.remove('dragover'); });
+});
+dragArea.addEventListener('drop', (e)=> {
+  const f = e.dataTransfer.files && e.dataTransfer.files[0];
+  if(f) handleSelectedFile(f);
+});
+
+function handleSelectedFile(file){
+  // file validation
+  const maxBytes = 3 * 1024 * 1024; // 3 MB recommended
+  if(file.size > maxBytes){
+    if(!confirm('File cukup besar (' + Math.round(file.size/1024) + ' KB). Tetap lanjut menyimpan ke localStorage? (bisa gagal)')) return;
+  }
+  const allowed = ['application/pdf'];
+  // images allowed
+  if(file.type.startsWith('image/') || allowed.includes(file.type)){
+    // read as data URL
+    const reader = new FileReader();
+    reader.onload = function(ev){
+      pendingFile = {
+        fileName: file.name,
+        fileType: file.type || 'application/octet-stream',
+        fileData: ev.target.result
+      };
+      selectedFileInfo.innerHTML = `<div><strong>${escapeHtml(file.name)}</strong> &middot; ${(Math.round(file.size/1024))} KB</div>`;
+    };
+    reader.onerror = function(){
+      pendingFile = null;
+      selectedFileInfo.textContent = 'Gagal membaca file.';
+    };
+    reader.readAsDataURL(file);
+  } else {
+    alert('Tipe file tidak didukung. Gunakan PDF atau gambar.');
+  }
+}
+
+/* Submit permohonan */
+el('reportForm').addEventListener('submit', function(e){
+  e.preventDefault();
+  const txt = el('reportText').value.trim();
+  if(!txt) return alert('Isi permohonan dulu.');
+  const entry = { text: txt, time: Date.now() };
+  if(pendingFile){
+    entry.fileName = pendingFile.fileName;
+    entry.fileType = pendingFile.fileType;
+    entry.fileData = pendingFile.fileData;
+  }
+  reports.push(entry);
+  const ok = saveReports();
+  if(ok){
+    showToast('Permohonan terkirim', pendingFile ? pendingFile.fileName : '');
+    // reset form
+    el('reportText').value = '';
+    pendingFile = null;
+    selectedFileInfo.textContent = '';
+    fileInput.value = '';
+  }
+});
+
+/* Clear all */
+el('btnClearReports').addEventListener('click', ()=>{
+  if(confirm('Hapus semua permohonan?')){
+    reports = [];
+    saveReports();
+    showToast('Semua permohonan dihapus');
+  }
+});
+
+/* helper: try to shrink localStorage if big (not reliable, just illustrative) */
+function attemptTrimStorage(){
+  try {
+    // keep last 30 reports only
+    if(reports.length > 300) {
+      reports = reports.slice(reports.length - 300);
+      localStorage.setItem(REPORTS_KEY, JSON.stringify(reports));
+    }
+  } catch(e){}
+}
+
+/* initial trim & render */
+attemptTrimStorage();
+renderReports();
+
+</script>
+</body>
+</html>
